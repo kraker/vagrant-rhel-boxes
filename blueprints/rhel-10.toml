@@ -1,0 +1,3 @@
+name = "rhel-10"
+description = "RHEL 10 Vagrant box. Uses image-builder defaults for the vagrant user, sudo, and SSH key."
+version = "0.0.1"
