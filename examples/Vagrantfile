@@ -1,14 +1,14 @@
-# Development environment example: a single RHEL 10 VM tuned for
-# remote-development workflows (VS Code Remote SSH, JetBrains Gateway,
-# vim over ssh, etc.).
+# Example Vagrantfile for kraker/rhel-10. A single RHEL 10 VM tuned
+# for development work over SSH (VS Code Remote SSH, JetBrains Gateway,
+# vim over ssh, etc.):
 #
-# Differences from the minimal single-vm example:
-#   - 4 GB RAM and 4 vCPUs for build/edit comfort.
+#   - 4 GB RAM, 4 vCPUs.
 #   - Static private network IP for stable SSH config entries.
-#   - Project root synced to /home/vagrant/project via rsync, so files
-#     edited on the VM via Remote SSH appear back on the host.
+#   - Project root synced to /home/vagrant/project via rsync.
+#   - vagrant-registration plugin attaches the VM to your RHSM
+#     subscription at first boot.
 #
-# Prerequisites (see ../README.md for the full list):
+# Prerequisites (see the repo README for full setup):
 #   vagrant plugin install vagrant-registration
 #   export RHSM_USERNAME="your-redhat-username"
 #   export RHSM_PASSWORD="your-redhat-password"
@@ -18,9 +18,8 @@
 #   vagrant ssh-config >> ~/.ssh/config   # for VS Code Remote SSH
 #   vagrant ssh
 #   # ... do dev work ...
-#   vagrant rsync-auto                    # in another terminal, optional:
-#                                         # syncs file changes from host -> VM
-#                                         # as you edit locally
+#   vagrant rsync-auto                    # optional, in another terminal:
+#                                         # streams host edits to the VM
 #   vagrant destroy                       # when done
 
 Vagrant.configure("2") do |config|

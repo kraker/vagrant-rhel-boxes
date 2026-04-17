@@ -33,11 +33,14 @@ vagrant up
 vagrant ssh
 ```
 
-The box ships **unregistered** — the `vagrant-registration` plugin
-hooks first boot to register against your own RHSM account using
-either env vars (above) or `config.registration.*` settings in the
-Vagrantfile. See [`examples/`](examples/) for ready-to-use Vagrantfiles
-covering common scenarios.
+The box ships **unregistered** — the [`vagrant-registration`][vr]
+plugin hooks first boot to register against your own RHSM account
+using either env vars (above) or `config.registration.*` settings in
+the Vagrantfile. See [`examples/Vagrantfile`](examples/Vagrantfile)
+for a ready-to-use Vagrantfile that covers a typical dev-VM setup
+(synced folder, static IP, custom resources).
+
+[vr]: https://rubygems.org/gems/vagrant-registration
 
 Don't have a Red Hat developer account? Sign up free at
 [developers.redhat.com](https://developers.redhat.com/).
@@ -70,7 +73,7 @@ The output `.box` file lands in `build/<version>-<provider>/`. You can
 ```
 blueprints/        # osbuild TOML blueprints (one per RHEL major version)
 scripts/           # build.sh and helpers
-examples/          # consumable example Vagrantfiles, see examples/README.md
+examples/          # ready-to-use Vagrantfile for the published box
 references/        # Red Hat docs the project is based on
 PLAN.md            # vision, scope, decisions, lessons learned
 ```
