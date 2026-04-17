@@ -1,0 +1,31 @@
+# Minimal example: bring up one RHEL 10 VM from kraker/rhel-10.
+#
+# Prerequisites (see ../README.md for the full list):
+#   vagrant plugin install vagrant-registration
+#   export RHSM_USERNAME="your-redhat-username"
+#   export RHSM_PASSWORD="your-redhat-password"
+#
+# Use:
+#   vagrant up
+#   vagrant ssh
+#   vagrant destroy   # when done
+
+Vagrant.configure("2") do |config|
+  config.vm.box      = "kraker/rhel-10"
+  config.vm.hostname = "rhel10"
+
+  # vagrant-registration: register the VM with RHSM at first boot using
+  # the credentials in the environment. Without these, the VM boots fine
+  # but `dnf install` will fail (no entitled repos).
+  config.registration.username = ENV["RHSM_USERNAME"]
+  config.registration.password = ENV["RHSM_PASSWORD"]
+
+  # Keep the registration when the VM is halted, so suspend/resume cycles
+  # don't churn the entitlement count. The VM is unregistered on destroy.
+  config.registration.unregister_on_halt = false
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "2048"
+    vb.cpus   = 2
+  end
+end

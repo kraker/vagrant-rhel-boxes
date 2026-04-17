@@ -323,52 +323,70 @@ vagrant-rhel-boxes/                 # repo root
 
 ## 7. Phased Plan
 
-### Phase 0 — Hello, World on the local Fedora workstation
+**Status as of 2026-04-16**: Phases 0, 1, and 2 complete in a single
+session. `kraker/rhel-10` v20260416.0 is published on HCP Vagrant
+Registry with both `virtualbox` and `libvirt` providers as an alpha
+(libvirt provider not yet smoke-tested locally — no libvirt setup on
+the Fedora workstation). Phase 3 (CI) deferred to the homelab build
+host.
 
-- Repo created on GitHub. (Done 2026-04-16:
-  `kraker/vagrant-rhel-boxes`.)
-- Install `image-builder` on the local Fedora workstation.
-- One blueprint: `blueprints/rhel-10.toml`, output type
-  `vagrant-libvirt`. Minimum viable customization: `vagrant` user
-  with sudo + the standard insecure Vagrant SSH key.
-- Repo override config so the Fedora-host `image-builder` pulls
-  RHEL 10 packages from RHSM CDN (using the user's RHSM creds), not
-  from Fedora's repos.
-- One script: `scripts/build.sh` that wraps
-  `sudo image-builder build --distro rhel-10.0 vagrant-libvirt`
-  with arg parsing for version and provider.
-- README documents how to run locally (set RHSM env vars, run
-  script).
+### Phase 0 — Hello, World on the local Fedora workstation ✅ DONE
 
-**Done when**: the user can run `./scripts/build.sh rhel-10 libvirt`
-on the Fedora workstation and get a RHEL 10 libvirt Vagrant box that
-`vagrant up` can boot.
+- Repo created on GitHub: `kraker/vagrant-rhel-boxes`.
+- `image-builder` v58 installed from the HashiCorp Fedora repo plus
+  `osbuild` + `osbuild-tools` from Fedora's own repos.
+- Blueprint `blueprints/rhel-10.toml` written (intentionally minimal
+  — image-builder's `vagrant-libvirt` and `vagrant-virtualbox` types
+  ship the vagrant user, sudo config, and insecure SSH key by default).
+- Build host registered to RHSM via `subscription-manager` so
+  image-builder can pull RHEL 10 packages from the CDN. No `--force-repo`
+  override needed — the RHEL 10 SCA entitlement was sufficient.
+- `scripts/build.sh` wraps `sudo image-builder build` with arg parsing
+  for version and provider.
 
-### Phase 1 — VirtualBox provider
+**Outcome**: `./scripts/build.sh rhel-10.0 vagrant-libvirt` produced a
+940 MB box in ~15 minutes.
 
-- Add `vagrant-virtualbox` output to the same blueprint.
-- Update `build.sh` to handle both providers (`build.sh rhel-10
-  libvirt`, `build.sh rhel-10 virtualbox`).
+### Phase 1 — VirtualBox provider ✅ DONE
 
-### Phase 2 — CI smoke-test
+- Same blueprint, built with `./scripts/build.sh rhel-10.0
+  vagrant-virtualbox`. 914 MB box.
+- Smoke-tested: `vagrant box add` + `vagrant up` succeeded; the box
+  booted and `cat /etc/os-release` returned authentic
+  `Red Hat Enterprise Linux 10.0 (Coughlan)`, kernel
+  `6.12.0-55.43.1.el10_0.x86_64`.
 
-- Self-hosted runner registered against the GitHub repo.
+### Phase 2 — First HCP publish ✅ DONE (as alpha)
+
+- `hcp` CLI installed from the HashiCorp Fedora repo.
+- Auth via `hcp auth login` (browser) → `hcp auth print-access-token`
+  → `VAGRANT_CLOUD_TOKEN`. This works around the broken
+  `vagrant cloud auth login` (see Lessons appendix).
+- Both providers published to `kraker/rhel-10` v20260416.0 with
+  `--direct-upload --no-release`, then `vagrant cloud version release
+  --force` to publish.
+- Marked alpha because the libvirt provider was published without
+  a local smoke test.
+
+### Phase 3 — CI smoke-test (TODO — homelab)
+
+- Self-hosted runner on the homelab build node.
 - Workflow: build both providers on PR / cron, fail the run if either
   build or boot smoke-test fails.
 
-### Phase 3 — Docs site + first article
+### Phase 4 — Docs site + first article (TODO)
 
 - Docs split into proper sections (`docs/`).
 - First article written and published on personal blog (or Dev.to /
   Medium first for SEO).
 - Repo README links the article; article links the repo.
 
-### Phase 4 — RHEL 9 blueprint
+### Phase 5 — RHEL 9 blueprint (TODO)
 
 - Add `blueprints/rhel-9.toml`.
 - CI matrix expanded to cover both RHEL versions × both providers.
 
-### Phase 5 — Iterate based on usage
+### Phase 6 — Iterate based on usage
 
 - React to issues / PRs from early users.
 - Refine docs based on actual confusion points.
@@ -472,3 +490,70 @@ it and a real enough need that the audience exists.
 - [lavabit/robox](https://github.com/lavabit/robox) — the cautionary
   tale; the project this work effectively replaces for RHEL.
 - [HashiCorp BSL adoption](https://www.hashicorp.com/en/blog/hashicorp-adopts-business-source-license)
+
+---
+
+## Appendix B — Lessons from Phase 0–2
+
+Captured from the first end-to-end build + publish on 2026-04-16. These
+are the gotchas that cost time and would have been worth knowing in
+advance — record them now so future-self doesn't relearn.
+
+### Auth: `vagrant cloud auth login` is broken post-HCP
+
+The interactive `vagrant cloud auth login` command still hits the legacy
+Vagrant Cloud auth endpoint, which returns `Method Not Allowed` against
+the post-migration HCP backend. Username/password isn't accepted either,
+because GitHub-OAuth'd HCP accounts have no password.
+
+**Working path**: install `hcp` (HashiCorp Fedora repo: `dnf install hcp`),
+then:
+
+```sh
+hcp auth login                            # browser flow, one-time per machine
+export VAGRANT_CLOUD_TOKEN=$(hcp auth print-access-token)
+vagrant cloud auth whoami                 # confirms the token works
+```
+
+The JWT from `print-access-token` is user-scoped and lasts ~1 hour. Fresh
+exec each time you need it for `vagrant cloud` commands. CI will use
+service principal credentials instead — see below.
+
+### Service principals work for CI, not interactive use
+
+Org-level **Contributor** role on a Service Principal is sufficient for
+publishing. The flow is OAuth2 client_credentials against
+`https://auth.idp.hashicorp.com/oauth2/token` — exchange Client ID +
+Secret for a JWT, then use the JWT as `VAGRANT_CLOUD_TOKEN`. Documented
+in §4 above; will become CI's auth path in Phase 3.
+
+The HCP UI for SP key generation is buried — at time of writing (HCP UI
+revs every few months), it wasn't visible from the SP detail page. Save
+the steps when figured out.
+
+### Vagrant Cloud field limits
+
+- `--short-description`: 120 character maximum. Validation only fires at
+  submit time; the CLI doesn't pre-check.
+
+### Publishing flags worth remembering
+
+- `--direct-upload` for boxes >100 MB. Sends the file directly to backend
+  storage instead of through the Vagrant Cloud API.
+- `--no-release` to publish as a draft for verification. Default
+  behavior is "do not release" but explicit is clearer.
+- `vagrant cloud version release` requires `--force` in non-interactive
+  contexts (otherwise it prompts for a TTY confirmation).
+
+### image-builder noise to ignore
+
+- `grub2-probe: error: failed to get canonical path of /dev/mapper/luks-...`
+  fires during the build pipeline when image-builder probes the host's
+  block devices. Non-fatal — the image's grub config is set from the
+  blueprint defaults, not the host's layout. Pure noise.
+
+### Box file ownership
+
+`image-builder build` runs under sudo, so the resulting `.box` file is
+root-owned. `chown` to the user before `vagrant box add` or
+`vagrant cloud publish`. Worth folding into `scripts/build.sh` later.

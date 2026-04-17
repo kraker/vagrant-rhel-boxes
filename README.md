@@ -9,30 +9,71 @@ elsewhere (Bento, the distros' own orgs).
 
 ## Status
 
-**Phase 0, just started.** Planning is done; first builds in progress.
-See [`PLAN.md`](PLAN.md) for the vision, scope, technical decisions,
-and phased rollout.
+**Alpha**: `kraker/rhel-10` v20260416.0 is published on HCP Vagrant
+Registry with `virtualbox` and `libvirt` providers. The libvirt
+provider hasn't been smoke-tested locally yet — use at your own risk
+or `vagrant box add` the libvirt box to verify it boots in your
+environment first.
 
-## How distribution works
+See [`PLAN.md`](PLAN.md) for the project's vision, scope, and roadmap.
 
-Two ways to consume this project, your pick:
+## Quick start: consume the published box
 
-1. **Use the published box** (when available — Phase 3+).
-   ```sh
-   vagrant plugin install vagrant-registration   # required for RHSM at boot
-   vagrant init kraker/rhel-10
-   vagrant up                                    # prompts for RHSM creds
-   ```
-   Boxes are unregistered; the `vagrant-registration` plugin handles
-   RHSM at first boot using your Red Hat developer account.
+```sh
+# One-time: install the plugin that registers RHEL with your subscription
+vagrant plugin install vagrant-registration
 
-2. **Build your own from the recipe.** Clone the repo, supply RHSM
-   credentials, run the build script. You get a box registered to you,
-   no plugin required at up-time. This is what the [Red Hat docs][rhdocs]
-   describe.
+# Provide your Red Hat developer credentials
+export RHSM_USERNAME="your-redhat-username"
+export RHSM_PASSWORD="your-redhat-password"
 
-The repo IS the recipe; the published boxes are a convenience built
-from that same recipe.
+# Bring up a VM
+vagrant init kraker/rhel-10
+vagrant up
+vagrant ssh
+```
+
+The box ships **unregistered** — the `vagrant-registration` plugin
+hooks first boot to register against your own RHSM account using
+either env vars (above) or `config.registration.*` settings in the
+Vagrantfile. See [`examples/`](examples/) for ready-to-use Vagrantfiles
+covering common scenarios.
+
+Don't have a Red Hat developer account? Sign up free at
+[developers.redhat.com](https://developers.redhat.com/).
+
+## Build your own from the recipe
+
+If you'd rather not depend on the published box — or want to customize
+the blueprint — the repo IS the recipe. This is the path Red Hat
+documents in [their Image Builder docs][rhdocs].
+
+```sh
+# Prerequisites (Fedora / RHEL family build host):
+sudo dnf install image-builder osbuild osbuild-tools subscription-manager
+sudo subscription-manager register --username <your-rh-username>
+
+git clone https://github.com/kraker/vagrant-rhel-boxes
+cd vagrant-rhel-boxes
+
+# Build a box (libvirt or virtualbox)
+./scripts/build.sh rhel-10.0 vagrant-libvirt
+# or
+./scripts/build.sh rhel-10.0 vagrant-virtualbox
+```
+
+The output `.box` file lands in `build/<version>-<provider>/`. You can
+`vagrant box add` it directly or wrap it in your own Vagrantfile.
+
+## How the project is laid out
+
+```
+blueprints/        # osbuild TOML blueprints (one per RHEL major version)
+scripts/           # build.sh and helpers
+examples/          # consumable example Vagrantfiles, see examples/README.md
+references/        # Red Hat docs the project is based on
+PLAN.md            # vision, scope, decisions, lessons learned
+```
 
 [rhdocs]: https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/composing_a_customized_rhel_system_image/creating-vagrant-boxes-with-rhel-image-builder
 

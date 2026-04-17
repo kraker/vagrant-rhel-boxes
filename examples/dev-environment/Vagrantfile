@@ -1,0 +1,49 @@
+# Development environment example: a single RHEL 10 VM tuned for
+# remote-development workflows (VS Code Remote SSH, JetBrains Gateway,
+# vim over ssh, etc.).
+#
+# Differences from the minimal single-vm example:
+#   - 4 GB RAM and 4 vCPUs for build/edit comfort.
+#   - Static private network IP for stable SSH config entries.
+#   - Project root synced to /home/vagrant/project via rsync, so files
+#     edited on the VM via Remote SSH appear back on the host.
+#
+# Prerequisites (see ../README.md for the full list):
+#   vagrant plugin install vagrant-registration
+#   export RHSM_USERNAME="your-redhat-username"
+#   export RHSM_PASSWORD="your-redhat-password"
+#
+# Use:
+#   vagrant up
+#   vagrant ssh-config >> ~/.ssh/config   # for VS Code Remote SSH
+#   vagrant ssh
+#   # ... do dev work ...
+#   vagrant rsync-auto                    # in another terminal, optional:
+#                                         # syncs file changes from host -> VM
+#                                         # as you edit locally
+#   vagrant destroy                       # when done
+
+Vagrant.configure("2") do |config|
+  config.vm.box      = "kraker/rhel-10"
+  config.vm.hostname = "rhel10-dev"
+
+  # Static private-network IP. Pick something on VirtualBox's host-only
+  # network range (192.168.56.0/21 in recent VirtualBox releases).
+  config.vm.network "private_network", ip: "192.168.56.50"
+
+  # Sync the directory containing this Vagrantfile to the VM. rsync is
+  # the most portable choice across providers; for VirtualBox-only setups
+  # `type: "virtualbox"` (Guest-Additions vboxsf) is also viable.
+  config.vm.synced_folder ".", "/home/vagrant/project", type: "rsync",
+    rsync__exclude: [".git/", ".vagrant/"]
+
+  config.registration.username           = ENV["RHSM_USERNAME"]
+  config.registration.password           = ENV["RHSM_PASSWORD"]
+  config.registration.unregister_on_halt = false
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.name   = "rhel10-dev"
+    vb.memory = "4096"
+    vb.cpus   = 4
+  end
+end
