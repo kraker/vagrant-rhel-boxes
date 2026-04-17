@@ -407,8 +407,8 @@ narrow but valuable topic.
    this plan. Sets up the project.
 2. **"Building a RHEL 10 Vagrant box with `image-builder`, the new
    Tech Preview CLI."**
-   The Phase 0 walkthrough using the daemonless CLI. Blueprint,
-   build script, RHSM, the works.
+   The Phase 0 walkthrough using the daemonless CLI. Covers the
+   blueprint, the build script, and RHSM setup end to end.
 3. **"`image-builder` vs `composer-cli`: which RHEL Image Builder
    CLI should you use?"**
    Comparison piece on the two CLIs in the same family. Concrete

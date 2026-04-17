@@ -1,7 +1,8 @@
 # `single-vm/` — minimum viable RHEL 10 VM
 
-The smallest Vagrantfile that brings up `kraker/rhel-10` and does the
-registration dance. Useful as a starting point or for ad-hoc testing.
+The smallest Vagrantfile that brings up `kraker/rhel-10` and registers
+it with RHSM at first boot. Useful as a starting point or for ad-hoc
+testing.
 
 ## What it does
 
