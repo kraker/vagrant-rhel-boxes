@@ -9,11 +9,13 @@ elsewhere (Bento, the distros' own orgs).
 
 ## Status
 
-**Alpha**: `kraker/rhel-10` v20260416.0 is published on HCP Vagrant
-Registry with `virtualbox` and `libvirt` providers. The libvirt
-provider hasn't been smoke-tested locally yet — use at your own risk
-or `vagrant box add` the libvirt box to verify it boots in your
-environment first.
+**Alpha**: [`kraker/rhel-10`][box] v20260416.0 is published on HCP
+Vagrant Registry with `virtualbox` and `libvirt` providers. The
+libvirt provider hasn't been smoke-tested locally yet — use at your
+own risk or `vagrant box add` the libvirt box to verify it boots in
+your environment first.
+
+[box]: https://app.vagrantup.com/kraker/boxes/rhel-10
 
 See [`PLAN.md`](PLAN.md) for the project's vision, scope, and roadmap.
 
