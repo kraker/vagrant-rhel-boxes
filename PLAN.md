@@ -486,6 +486,26 @@ it and a real enough need that the audience exists.
       pattern the rhcsa-field-manual repo used), keyring/secret-tool
       integration, or whether `vagrant-registration` itself supports
       a credentials file path.
+- [ ] **Add VirtualBox Guest Additions to the box.** The first
+      consumer (rhcsa-field-manual dogfood, 2026-04-17) hit
+      "unknown filesystem type 'vboxsf'" because image-builder doesn't
+      install Guest Additions by default. Workaround there is
+      `synced_folder type: "rsync"` but that's host→VM only and
+      surprises anyone expecting Bento-style vboxsf mounts. Options:
+      (a) bake guest additions into the blueprint via the VirtualBox
+      installer ISO post-compose step, (b) install
+      `virtualbox-guest-additions` from RPMFusion or similar in
+      provisioning, (c) document the rsync workaround as the official
+      pattern. The libvirt provider has the same class of issue with
+      9p — needs `kernel-modules-extra` or virtfs setup verified.
+- [ ] **Document `config.registration.auto_attach = false` requirement
+      for RHEL 10.** Same dogfood hit `subscription-manager: error: no
+      such option: --auto-attach` because RHEL 10 dropped the flag
+      (Simple Content Access is now the default model) but
+      vagrant-registration v1.3.4 still passes it. Override in the
+      consumer Vagrantfile is the workaround; documenting it on the
+      box's HCP description and in `examples/*/Vagrantfile` would save
+      every new user the same debug session.
 
 ---
 
