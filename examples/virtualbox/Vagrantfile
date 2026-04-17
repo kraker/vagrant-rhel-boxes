@@ -1,0 +1,26 @@
+# kraker/rhel-10 with VirtualBox.
+#
+# Prerequisites:
+#   vagrant plugin install vagrant-registration
+#   export RHSM_USERNAME="your-redhat-username"
+#   export RHSM_PASSWORD="your-redhat-password"
+#
+# Use:
+#   vagrant up --provider virtualbox
+#   vagrant ssh
+#   vagrant destroy
+
+Vagrant.configure("2") do |config|
+  config.vm.box      = "kraker/rhel-10"
+  config.vm.hostname = "rhel10"
+
+  config.registration.username           = ENV["RHSM_USERNAME"]
+  config.registration.password           = ENV["RHSM_PASSWORD"]
+  config.registration.unregister_on_halt = false
+
+  config.vm.provider "virtualbox" do |vb|
+    # Provider-specific overrides go here, e.g.:
+    # vb.memory = 4096
+    # vb.cpus   = 4
+  end
+end
