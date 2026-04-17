@@ -106,56 +106,107 @@ That's the entire matrix.
 
 ---
 
-## 3. The Distribution Model: Recipes, Not Binaries
+## 3. The Distribution Model: Hybrid (Recipe Source + Unregistered Binaries)
 
 This is the central architectural decision and the most important
 thing to understand about the project.
 
-### Why recipes only
+### The RHEL EULA constraint
 
-Red Hat's developer subscription is per-account. A RHEL box that's been
-registered to RHSM during build cannot be redistributed without
-violating the subscription terms. This is why:
+Red Hat's developer subscription is per-account. A RHEL box that's
+been *registered to RHSM during build* cannot be redistributed
+without violating the subscription terms. This is why:
 
 - Bento publishes Rocky 10 and Alma 10 but **never** RHEL.
-- Roboxes' `generic/rhel*` boxes were always unregistered and required
-  the user to register at `vagrant up` time via `vagrant-registration`
-  — a tolerated gray area Red Hat could revisit at any time.
+- Roboxes' `generic/rhel*` boxes were always **unregistered** and
+  required the user to register at `vagrant up` time via the
+  `vagrant-registration` plugin — a tolerated gray area Red Hat
+  could revisit at any time.
 
-There are two paths the project could have taken:
+### The hybrid model (chosen)
 
-1. **Recipes only (chosen).** Ship the osbuild blueprint, a build
-   script, docs. Users supply their own RHSM credentials, run the
-   build locally, get a RHEL box that's registered to *them*. Zero
-   redistribution issues. Zero gray area. Aligned with [Red Hat's own
-   documented path](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/composing_a_customized_rhel_system_image/creating-vagrant-boxes-with-rhel-image-builder).
-2. **Unregistered binaries** (Roboxes model). Ship a pre-built but
-   unregistered box; require `vagrant-registration` at up-time.
-   Tolerated historically, not formally blessed.
+The repo serves two audiences in one design:
 
-We pick (1) on principle: it's the Red Hat-official path, it's
-unambiguous about the licensing, and the build experience is part of
-the consulting-brand value proposition (you learn the toolchain by
-running it).
+1. **The recipe.** Anyone can `git clone` the repo and build their
+   own box from the blueprint, registered to their own RHSM account.
+   Zero redistribution concerns. This is how RHEL itself documents
+   the [Image Builder Vagrant path](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/composing_a_customized_rhel_system_image/creating-vagrant-boxes-with-rhel-image-builder).
+2. **Pre-built, unregistered boxes.** CI builds the recipe and
+   publishes the resulting boxes to HCP Vagrant Registry (primary)
+   and GitHub Releases (backup). Users can `vagrant init kraker/rhel-10`
+   and `vagrant up`; the `vagrant-registration` plugin handles RHSM
+   at boot time. This is the Roboxes model — gray area but tolerated
+   for years.
+
+The recipe is the substantive contribution; the binaries are a
+convenience that gets the project into the same ergonomic territory
+as `bento/rockylinux-10`.
 
 ### What that implies for the repo
 
-- **No `.box` files in releases.** Nothing to upload to HCP Vagrant
-  Registry. Probably nothing on GitHub Releases either.
-- **The repo IS the distribution.** `git clone`, `make build`. Docs
-  are the user interface.
-- **CI's job is recipe validation, not binary publishing.** A
-  self-hosted runner builds the recipe end-to-end on every change
-  with secrets-injected RHSM creds, throws away the result, reports
-  pass/fail. Catches blueprint drift.
+- **`.box` files DO get published**, to HCP Vagrant Registry +
+  GitHub Releases. Boxes are unregistered; `vagrant-registration`
+  plugin is a documented prerequisite.
+- **The repo also stands alone as a recipe.** `git clone`, set RHSM
+  env vars, `./scripts/build.sh` produces a box locally without
+  needing the published artifact.
+- **CI does both jobs**: validate the recipe (PR smoke-test) AND
+  publish releases (on tag push).
+- **No paid hosting.** HCP Vagrant Registry's free tier and GitHub
+  Releases are the entire distribution surface. If/when traffic
+  outgrows free tiers, that's a happy problem to solve later.
 
 ---
 
-## 4. Build Toolchain: Red Hat Image Builder (osbuild)
+## 4. Build Toolchain: RHEL Image Builder (`image-builder` CLI)
 
 ### Decision
 
-Image Builder is the toolchain. Packer was considered and rejected.
+RHEL Image Builder is the toolchain. Within the Image Builder family
+there are two CLI options; we pick the newer `image-builder` CLI over
+the older `composer-cli`. Packer was considered and rejected.
+
+### The two Image Builder CLIs
+
+Red Hat ships two command-line interfaces to the same underlying
+osbuild engine:
+
+| | `composer-cli` | `image-builder` |
+|---|---|---|
+| Status | GA | **Technology Preview** (RHEL 10.0+) |
+| Architecture | Client/server with `osbuild-composer.service` daemon | Daemonless |
+| Workflow | Push blueprint → start compose → poll → fetch | Single `image-builder build` command |
+| Container-friendly | No | Yes (designed for ephemeral pipelines) |
+| State | Persistent (daemon holds blueprints/composes) | Stateless |
+| Surface in RHEL 10 docs | Legacy reference path | The path the doc leads with |
+
+Both CLIs consume the same TOML blueprints and produce the same image
+types — so the choice between them is operational, not architectural.
+A switch later is a script change, not a re-architecture.
+
+### Why `image-builder` over `composer-cli`
+
+1. **Simplicity is real.** The full Vagrant build is one command:
+   `sudo image-builder build --distro rhel-10.0 vagrant-libvirt`. With
+   composer-cli you manage a daemon, push the blueprint, kick off a
+   compose, poll for status, and fetch the artifact — five commands
+   and stateful daemon management.
+2. **Daemonless = better for CI.** The self-hosted GitHub Actions
+   runner has no service to register, manage, or recover. Each build
+   is a clean process tree that exits when done.
+3. **Container-friendly.** `image-builder` is designed for use inside
+   containers. Doors stay open for ephemeral CI builds even if we
+   don't use them initially.
+4. **Red Hat is leading with it.** The entire RHEL 10 documentation
+   for image building is written around `image-builder`, not
+   composer-cli — even chapters covering KVM, cloud uploads, Vagrant,
+   and OpenSCAP integration. The Tech Preview label is procedural;
+   the editorial decision is "this is the way."
+5. **Brand and content alignment.** Being early on a Tech Preview
+   tool that's clearly the future is exactly the kind of leading-edge
+   positioning the consulting brand benefits from. "Here's how to use
+   the new official RHEL build tool" is more interesting than
+   "here's how to use the old one."
 
 ### Why Image Builder over Packer
 
@@ -164,31 +215,34 @@ Image Builder is the toolchain. Packer was considered and rejected.
    artifact. Picking Packer would put this project alongside ten
    others; Image Builder puts it nearly alone.
 2. **Content opportunity.** "Packer Vagrant box tutorial" returns
-   hundreds of articles. "osbuild Vagrant box" returns Red Hat's docs
-   and almost nothing else. Every planned article occupies nearly
-   virgin search territory.
+   hundreds of articles. "image-builder Vagrant box" returns Red
+   Hat's docs and almost nothing else.
 3. **Faster builds, simpler recipes.** Image Builder composes from
    packages; builds are minutes, not tens of minutes. TOML blueprints
    are dramatically smaller and more declarative than HCL templates +
    kickstart files.
-4. **First-class Vagrant box output.** RHEL 10.1+ ships
-   `vagrant-libvirt` and `vagrant-virtualbox` as native osbuild image
-   types — no manual box wrapping.
+4. **First-class Vagrant box output.** RHEL 10.0+ ships
+   `vagrant-libvirt` and `vagrant-virtualbox` as native image types
+   — no manual box wrapping.
 5. **No HashiCorp licensing concerns.** osbuild is Apache 2.0 / GPL.
    Packer is BUSL since 2023.
 
 ### Trade-offs to manage
 
-- **Build host constraint**: every CI runner that does an actual build
+- **Tech Preview status.** `image-builder` could change incompatibly
+  before GA. Mitigation: pin to a known-good version on the build
+  host; the blueprints themselves are stable across CLIs (composer-cli
+  consumes the same TOML). Worst case we swap the build script.
+- **Build host constraint**: every runner that does an actual build
   must be RHEL/Fedora/Rocky/Alma. GitHub-hosted Ubuntu runners can't
-  run `osbuild-composer`. Mitigation: self-hosted runner on the
-  homelab build node.
+  run image-builder. Mitigation: self-hosted runner on the homelab
+  build node.
 - **Single provider per build**: producing both libvirt and VirtualBox
-  boxes for one RHEL version means two osbuild invocations, not one.
-  CI handles this with a build matrix.
-- **Less of a community safety net**: when something breaks in
-  osbuild, the references are Red Hat docs and osbuild GitHub issues.
-  Plan for more independent debugging — also the content opportunity.
+  boxes for one RHEL version means two `image-builder build`
+  invocations, not one. CI handles this with a build matrix.
+- **Less of a community safety net**: when something breaks, the
+  references are Red Hat docs and the osbuild GitHub issues. Plan for
+  more independent debugging — also the content opportunity.
 
 ---
 
@@ -197,14 +251,14 @@ Image Builder is the toolchain. Packer was considered and rejected.
 Single GitHub repo, RHEL-only, deliberately small.
 
 ```
-rhel-vagrant-boxes/                 # repo root (working name)
+vagrant-rhel-boxes/                 # repo root
 ├── README.md                       # quickstart: clone, source creds, make build
-├── LICENSE                         # Apache 2.0 (matches osbuild upstream)
+├── LICENSE                         # Apache-2.0 (matches osbuild upstream)
 ├── blueprints/
 │   ├── rhel-10.toml                # current focus
 │   └── rhel-9.toml                 # later
 ├── scripts/
-│   ├── build.sh                    # wraps composer-cli for one (version, provider) build
+│   ├── build.sh                    # wraps `image-builder build` for one (version, provider) build
 │   ├── lib/                        # shared bash helpers
 │   └── ci/                         # CI smoke-test entry points
 ├── customizations/                 # post-compose tweaks (vagrant user, sudoers)
@@ -223,8 +277,6 @@ rhel-vagrant-boxes/                 # repo root (working name)
 
 ### Naming conventions
 
-- Repo: TBD final name; working name `rhel-vagrant-boxes`. Should match
-  the consulting brand handle.
 - Blueprint files: `rhel-<major>-<minor>.toml` if minor matters, else
   `rhel-<major>.toml`.
 
@@ -234,12 +286,19 @@ rhel-vagrant-boxes/                 # repo root (working name)
 
 ### Build hardware: homelab
 
-- Dedicated build node in the homelab (existing hardware).
-- **Must run a RHEL-family OS** (Rocky 10 or RHEL 10) so
-  `osbuild-composer` and `composer-cli` are available.
+- **Phase 0 / prototyping (now)**: local Fedora workstation. `image-builder`
+  runs natively on Fedora. The wrinkle is that building RHEL images
+  from a Fedora host needs RHSM credentials plus repo overrides
+  pointing at RHEL CDN — the host's own Fedora repos can't satisfy
+  RHEL package requests.
+- **Phase 2+ (later)**: dedicated build node in the homelab on RHEL 10
+  or Rocky 10. Aspirational — moves CI builds off the workstation and
+  exercises the same OS the eventual users would be on.
+- **Image Builder is daemonless.** No `osbuild-composer.service` to
+  manage on either host.
 - Required: nested virt for VirtualBox compose, ≥32 GB RAM, ≥500 GB
-  SSD, 8+ cores comfortable.
-- KVM/libvirt enabled (default on RHEL family).
+  SSD, 8+ cores comfortable. (Workstation likely has all of this.)
+- KVM/libvirt enabled (default on Fedora and RHEL family).
 
 ### CI: GitHub Actions + self-hosted runner
 
@@ -264,21 +323,26 @@ rhel-vagrant-boxes/                 # repo root (working name)
 
 ## 7. Phased Plan
 
-### Phase 0 — Hello, World (one weekend)
+### Phase 0 — Hello, World on the local Fedora workstation
 
-- Repo created on GitHub. Final name picked.
-- Provision the homelab build node with Rocky 10 (or RHEL 10) +
-  osbuild-composer.
+- Repo created on GitHub. (Done 2026-04-16:
+  `kraker/vagrant-rhel-boxes`.)
+- Install `image-builder` on the local Fedora workstation.
 - One blueprint: `blueprints/rhel-10.toml`, output type
-  `vagrant-libvirt`.
-- One script: `scripts/build.sh` that calls `composer-cli compose
-  start rhel-10 vagrant-libvirt` and waits for completion.
+  `vagrant-libvirt`. Minimum viable customization: `vagrant` user
+  with sudo + the standard insecure Vagrant SSH key.
+- Repo override config so the Fedora-host `image-builder` pulls
+  RHEL 10 packages from RHSM CDN (using the user's RHSM creds), not
+  from Fedora's repos.
+- One script: `scripts/build.sh` that wraps
+  `sudo image-builder build --distro rhel-10.0 vagrant-libvirt`
+  with arg parsing for version and provider.
 - README documents how to run locally (set RHSM env vars, run
   script).
 
-**Done when**: someone with RHSM credentials can clone the repo, set
-two env vars, run one command, and get a RHEL 10 libvirt Vagrant box
-they can `vagrant up`.
+**Done when**: the user can run `./scripts/build.sh rhel-10 libvirt`
+on the Fedora workstation and get a RHEL 10 libvirt Vagrant box that
+`vagrant up` can boot.
 
 ### Phase 1 — VirtualBox provider
 
@@ -323,20 +387,26 @@ narrow but valuable topic.
 1. **"Why there's no `generic/rhel10` and what to do about it."**
    The opening salvo. Mostly drafted in the conversation that produced
    this plan. Sets up the project.
-2. **"The Red Hat-official way to build a RHEL 10 Vagrant box."**
-   The Phase 0 walkthrough. Blueprint, build script, RHSM, the works.
-3. **"Image Builder vs Packer for Vagrant boxes: when the official
+2. **"Building a RHEL 10 Vagrant box with `image-builder`, the new
+   Tech Preview CLI."**
+   The Phase 0 walkthrough using the daemonless CLI. Blueprint,
+   build script, RHSM, the works.
+3. **"`image-builder` vs `composer-cli`: which RHEL Image Builder
+   CLI should you use?"**
+   Comparison piece on the two CLIs in the same family. Concrete
+   recommendation, honest about Tech Preview risk.
+4. **"Image Builder vs Packer for Vagrant boxes: when the official
    tool is the right choice."**
-   Honest comparison. Argues for Image Builder on first principles
+   Cross-tool comparison. Argues for Image Builder on first principles
    without dismissing Packer. The flagship piece.
-4. **"Why I ship recipes, not binaries: the RHEL EULA and you."**
+5. **"Why I ship recipes, not binaries: the RHEL EULA and you."**
    The recipes-only architectural decision, made teachable.
-5. **"Self-hosted GitHub Actions runners on a Rocky / RHEL build
+6. **"Self-hosted GitHub Actions runners on a Rocky / RHEL build
    host."**
    The CI infrastructure piece. Phase 2 material.
-6. **"Customizing RHEL Vagrant boxes with osbuild blueprints."**
+7. **"Customizing RHEL Vagrant boxes with Image Builder blueprints."**
    Deep dive on the TOML blueprint format. Recurring reference piece.
-7. **"What I learned maintaining the RHEL Vagrant box recipe for one
+8. **"What I learned maintaining the RHEL Vagrant box recipe for one
    year."**
    12-month retrospective. Confirms the project still ships.
 
@@ -368,12 +438,19 @@ it and a real enough need that the audience exists.
       upstream and Bento. Revisitable — MIT is the obvious alternative
       if Apache-2.0 starts to feel too institutional for the
       learners-and-DevOps audience.
-- [ ] Confirm homelab build node OS (Rocky 10 vs RHEL 10). RHEL gives
-      authentic experience and exercises the same RHSM dance the user
-      would do; Rocky removes the build-host registration step.
-- [ ] Whether to publish a "metadata-only" entry on HCP Vagrant
-      Registry pointing users at the repo. Probably no — would just
-      confuse the recipes-only model.
+- [x] **CLI: `image-builder` (Tech Preview)** over `composer-cli`
+      (decided 2026-04-16). Daemonless, simpler, container-friendly,
+      and the path Red Hat's RHEL 10 docs lead with. Tech Preview risk
+      is bounded: blueprints are CLI-agnostic, so a fallback to
+      composer-cli is a script change.
+- [x] **Build host (Phase 0): local Fedora workstation** (decided
+      2026-04-16). Homelab RHEL/Rocky build node deferred to Phase 2+.
+- [x] **Distribution model: hybrid** (decided 2026-04-16). Recipe in
+      the repo; unregistered binaries published to HCP Vagrant Registry
+      + GitHub Releases. No paid hosting. Reopens the EULA gray area
+      (Roboxes-style); accepted as a deliberate trade for adoption.
+- [ ] Pin a known-good `image-builder` version on the build host to
+      insulate against Tech Preview API churn.
 - [ ] Whether to support both RHEL 10 and RHEL 9 from the start, or
       RHEL 10 only and add RHEL 9 if users ask.
 - [ ] Personal blog platform: own domain from day one, or start on
@@ -385,10 +462,11 @@ it and a real enough need that the audience exists.
 
 ## Appendix A — References
 
-- [osbuild project](https://osbuild.org/) — the tool.
+- [osbuild project](https://osbuild.org/) — the underlying engine
+  both `image-builder` and `composer-cli` drive.
 - [Image Builder: vagrant-virtualbox image type (RHEL 10.1)](https://osbuild.org/docs/user-guide/image-descriptions/rhel-10.1/vagrant-virtualbox/)
 - [Image Builder: vagrant-libvirt image type](https://osbuild.org/docs/user-guide/image-descriptions/rhel-10.1/vagrant-libvirt/)
-- [Red Hat docs: Creating Vagrant boxes with RHEL image builder (RHEL 10)](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/composing_a_customized_rhel_system_image/creating-vagrant-boxes-with-rhel-image-builder)
+- [Red Hat docs: Composing a customized RHEL system image (RHEL 10)](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/composing_a_customized_rhel_system_image/) — full doc; Chapter 12 covers Vagrant. A copy is bundled at `references/Red_Hat_Enterprise_Linux-10-Composing_a_customized_RHEL_system_image-en-US.pdf` (CC-BY-SA 3.0).
 - [chef/bento](https://github.com/chef/bento) — model for repo
   structure (uses Packer, builds Rocky/Alma not RHEL).
 - [lavabit/robox](https://github.com/lavabit/robox) — the cautionary
