@@ -475,6 +475,17 @@ it and a real enough need that the audience exists.
       Dev.to / Medium for SEO?
 - [ ] Should the consulting brand site link to the repo, or should
       they evolve in parallel and converge later?
+- [ ] **Better RHSM credential handling than `export` in shell.** The
+      examples and README currently document
+      `export RHSM_USERNAME=... RHSM_PASSWORD=...` for the
+      `vagrant-registration` plugin to pick up, which leaves the
+      password in shell history and visible in `/proc/<pid>/environ`.
+      Acceptable for now (these are dev creds, low blast radius) but
+      worth a follow-up. Candidates to evaluate: a sourced
+      `.rhel-credentials` file documented as never-committed (the
+      pattern the rhcsa-field-manual repo used), keyring/secret-tool
+      integration, or whether `vagrant-registration` itself supports
+      a credentials file path.
 
 ---
 
