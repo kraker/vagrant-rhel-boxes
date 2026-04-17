@@ -40,7 +40,7 @@ the Vagrantfile. See [`examples/virtualbox/`](examples/virtualbox/)
 or [`examples/libvirt/`](examples/libvirt/) for a minimal Vagrantfile
 per provider.
 
-[vr]: https://rubygems.org/gems/vagrant-registration
+[vr]: https://github.com/projectatomic/adb-vagrant-registration
 
 Don't have a Red Hat developer account? Sign up free at
 [developers.redhat.com](https://developers.redhat.com/).
