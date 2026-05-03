@@ -1,2 +1,3 @@
 # vagrant-rhel-boxes
-Automate building RHEL Vagrant boxes
+
+Automate building RHEL Vagrant boxes.
