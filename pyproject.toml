@@ -1,12 +1,11 @@
 [project]
 name = "vagrant-rhel-boxes"
 version = "0.1.0"
-description = "Add your description here"
+description = "Automate building RHEL Vagrant boxes"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "ansible>=13.6.0",
-    "ansible-lint>=26.4.0",
+    "ansible-core>=2.20.5",
+    "ansible-dev-tools>=26.4.6",
     "prek>=0.3.11",
-    "pymarkdownlnt>=0.9.36",
 ]

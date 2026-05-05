@@ -1,0 +1,10 @@
+---
+ansible-navigator:
+  mode: stdout
+  execution-environment:
+    # Disable EE or targeting localhost is actually the container.
+    enabled: false
+    pull:
+      policy: missing
+  playbook-artifact:
+    enable: false

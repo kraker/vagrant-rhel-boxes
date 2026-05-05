@@ -1,1 +1,16 @@
+# .gitignore
+
+# uv
 .venv/
+
+# vagrant
+.vagrant/
+
+# image-builder build artifacts
+build/
+
+# ansible-navigator runtime log
+ansible-navigator.log
+
+# Proprietary references
+references/*.pdf

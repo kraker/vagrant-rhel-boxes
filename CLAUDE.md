@@ -1,0 +1,73 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Purpose
+
+Builds RHEL Vagrant boxes (libvirt + virtualbox providers) by driving the daemonless `image-builder` CLI from a small Ansible playbook. The resulting `.box` files land under `build/` for inspection or hand-off to a `vagrant box add` step. Playbooks always target `localhost` — the control node *is* the build host. Long-term goal is automating the same playbook from a GitHub Actions self-hosted runner on this machine, with eventual publication of boxes to Vagrant Cloud.
+
+## Setup
+
+Python deps managed with `uv` (Python 3.12+, see `.python-version`):
+
+```bash
+uv sync                # creates .venv with ansible-core + ansible-dev-tools + prek
+```
+
+Host-side prerequisites (not handled by the playbook):
+
+- `vagrant` from HashiCorp.
+- For libvirt provider: `libvirt-devel` + the `vagrant-libvirt` plugin (see README).
+- For VirtualBox provider: VirtualBox installed (Oracle's repo on RHEL — non-trivial; the build will fail without it).
+- Passwordless sudo for the invoking user, or run with `--ask-become-pass`. The playbook uses `become: true` at the play level because `image-builder build` requires root.
+- Active RHEL subscription with BaseOS + AppStream enabled (image-builder pulls from CDN at compose time).
+- ~20 GiB free in `/var/cache/`, 4 GiB RAM minimum (per the RHEL 10 docs' system requirements).
+
+The playbook installs `image-builder` itself via dnf — no manual install needed.
+
+## Common commands
+
+```bash
+# Build the libvirt box for the default distro (rhel-10.0)
+uv run ansible-playbook build_box.yml
+
+# Build the virtualbox box
+uv run ansible-playbook build_box.yml -e provider=virtualbox
+
+# Select a different blueprint by distro — loads blueprints/<distro>.toml
+uv run ansible-playbook build_box.yml -e distro=rhel-10.1
+
+# Lint everything (mirror of CI)
+uv run prek run --all-files
+
+# Bring up the resulting box (after a manual vagrant box add)
+vagrant up
+```
+
+The playbook builds **one provider per invocation** by design — that maps cleanly onto a GitHub Actions matrix where each provider runs as its own job in parallel on the self-hosted runner.
+
+`vagrant box add` is currently commented out at the bottom of `build_box.yml`. Run it manually after a build, e.g. `vagrant box add --force --name kraker/rhel-10 --provider=libvirt build/rhel-10.0-vagrant-libvirt-x86_64/rhel-10.0-vagrant-libvirt-x86_64.box`. Uncomment the task when the box-add step is ready to be part of the pipeline.
+
+`ansible-navigator.yml` keeps the execution environment disabled because playbooks target localhost — running them inside a container would target the container instead of the host.
+
+## Architecture
+
+The build pipeline is **`image-builder` CLI consuming a local blueprint TOML**, with a thin Ansible wrapper for orchestration:
+
+- `inventory` — single line, `localhost ansible_connection=local`. Everything runs on the box you invoke from.
+- `blueprints/<distro>.toml` — one file per RHEL/Fedora minor version (`rhel-10.0.toml`, `rhel-10.1.toml`, ...). The filename matches the distro string, which the playbook uses to resolve `blueprint_path` from the `distro` var. Blueprints are deliberately minimal: the `vagrant-libvirt` and `vagrant-virtualbox` image types already ship a `vagrant` user with sudo and a generous default package set, so blueprints only add things the image type doesn't already provide. Each blueprint owns its own top-level `distro = "..."` field; image-builder reads it from there.
+- `build_box.yml` — single playbook at repo root. Runs with `become: true` at the play level. Vars: `blueprint_path` (templated from `distro`, default `rhel-10.0`), `output_dir` (`build/`), `box_name` (`kraker/rhel-10`), and `provider` (default `libvirt`). Tasks: dnf-install `image-builder`, run `image-builder build vagrant-<provider> --blueprint <path> --output-dir <dir> --with-manifest`, then chown the entire `output_dir` back to `ansible_user_id` so non-root tasks (and CI artifact upload) can read the result.
+- `--with-manifest` is on by default so every build drops an osbuild manifest next to the `.box` for provenance. `--with-sbom` is available too if SPDX SBOMs become a CI requirement; not currently set.
+- The build task is wrapped with `ignore_errors: true` so that the chown step still runs on failure — partial root-owned artifacts get reclaimed and stay inspectable without sudo.
+- Artifact path is **deterministic**, written by image-builder under `output_dir`: `build/{distro}-vagrant-{provider}-{arch}/{distro}-vagrant-{provider}-{arch}.box`. For example: `build/rhel-10.0-vagrant-libvirt-x86_64/rhel-10.0-vagrant-libvirt-x86_64.box`. The playbook does not construct or validate this path; that's image-builder's contract.
+- `Vagrantfile` consumes the registered box (`kraker/rhel-10`) and configures both libvirt and virtualbox providers. Synced folder is intentionally disabled.
+
+When changing what's in the image, edit the relevant `blueprints/<distro>.toml`. When changing how the build runs (extra repos, SBOM, distro pinning), edit the `image-builder build` task in `build_box.yml`. When changing what the resulting VM looks like at boot, that's `Vagrantfile`.
+
+### Why this shape
+
+Earlier iterations tried `infra.osbuild` (broken on RHEL 10, see issue #572) and `myllynen.rhel-image` (forces git-hosted blueprints, no local-file mode). Both are wrappers around `composer-cli`, which is the WeldR-socket client for the legacy `osbuild-composer` daemon. The `image-builder` CLI is upstream osbuild's daemonless replacement — same capabilities, no socket, no group membership, single dnf install. Build artifacts (the `.box` files) include the Vagrant metadata.json + Vagrantfile + image, so no separate box-packaging step is needed.
+
+## Lint / CI
+
+GitHub Actions (`.github/workflows/lint.yml`) runs `prek` on every push/PR. Hooks in `.pre-commit-config.yaml`: trailing-whitespace, end-of-file-fixer, check-added-large-files, `uv-lock` (keeps `uv.lock` synced with `pyproject.toml`), `yamllint`, `ansible-lint`. `prek` is a drop-in `pre-commit` reimplementation — same hook IDs and config schema.
