@@ -1,0 +1,51 @@
+name: Build Vagrant boxes
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'blueprints/**'
+      - 'build_box.yml'
+      - '.github/workflows/build.yml'
+
+# One run per branch. Keeps the matrix from racing itself when commits
+# land back-to-back; lets different branches build concurrently.
+concurrency:
+  group: image-builder-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: [self-hosted, linux]
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [libvirt, virtualbox]
+        distro: [rhel-10.0, rhel-10.1]
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Sync Python deps
+        run: uv sync --frozen
+
+      # Self-hosted runners reuse the workspace; clear stale artifacts.
+      - name: Clean previous build output
+        run: rm -rf build/
+
+      - name: Build ${{ matrix.distro }} ${{ matrix.provider }} box
+        run: |
+          uv run ansible-playbook build_box.yml \
+            -e provider=${{ matrix.provider }} \
+            -e distro=${{ matrix.distro }}
+
+      - name: Upload box + manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.distro }}-vagrant-${{ matrix.provider }}
+          path: build/${{ matrix.distro }}-vagrant-${{ matrix.provider }}-*/
+          if-no-files-found: error
+          retention-days: 14
