@@ -7,6 +7,11 @@
     blueprint_path: "blueprints/{{ distro | default('rhel-10.0') }}.toml"
     output_dir: "build/"
     box_name: kraker/rhel-10
+    # Resolved on the controller side, before `become` switches us to root,
+    # so this captures the real invoking user (github-runner in CI, the
+    # shell user locally). `ansible_user_id` would resolve to root once
+    # become is in effect, making the chown a no-op.
+    invoking_user: "{{ lookup('env', 'USER') }}"
 
   tasks:
     - name: Install image-builder
@@ -32,8 +37,8 @@
           ansible.builtin.file:
             path: "{{ output_dir }}"
             state: directory
-            owner: "{{ ansible_user_id }}"
-            group: "{{ ansible_user_id }}"
+            owner: "{{ invoking_user }}"
+            group: "{{ invoking_user }}"
             recurse: true
 
     # - name: Add the built box to the local Vagrant index
