@@ -14,26 +14,27 @@
         name: image-builder
         state: present
 
-    - name: Build the Vagrant box (several minutes)
-      ansible.builtin.command:
-        cmd: >-
-          image-builder build vagrant-{{ provider | default('libvirt') }}
-          --blueprint {{ blueprint_path }}
-          --output-dir "{{ output_dir }}"
-          --with-manifest
-      changed_when: true
-      # Ignore errors so that file ownership is still reclaimed.
-      ignore_errors: true
-
-    # image-builder runs as root; chown so non-root tasks (vagrant box add,
-    # CI artifact upload) can read the .box.
-    - name: Reclaim ownership of build artifacts
-      ansible.builtin.file:
-        path: "{{ output_dir }}"
-        state: directory
-        owner: "{{ ansible_user_id }}"
-        group: "{{ ansible_user_id }}"
-        recurse: true
+    # image-builder runs as root; the always: block chowns artifacts back so
+    # non-root tasks (vagrant box add, CI artifact upload) can read them
+    # whether the build succeeded or failed.
+    - name: Build the Vagrant box and reclaim ownership
+      block:
+        - name: Build the Vagrant box (several minutes)
+          ansible.builtin.command:
+            cmd: >-
+              image-builder build vagrant-{{ provider | default('libvirt') }}
+              --blueprint {{ blueprint_path }}
+              --output-dir "{{ output_dir }}"
+              --with-manifest
+          changed_when: true
+      always:
+        - name: Reclaim ownership of build artifacts
+          ansible.builtin.file:
+            path: "{{ output_dir }}"
+            state: directory
+            owner: "{{ ansible_user_id }}"
+            group: "{{ ansible_user_id }}"
+            recurse: true
 
     # - name: Add the built box to the local Vagrant index
     #   ansible.builtin.command:

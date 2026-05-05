@@ -28,6 +28,11 @@ vagrant plugin install vagrant-libvirt
 ansible-navigator run infra.osbuild.osbuild_setup_server
 ```
 
+## Roadmap
+
+* [ ] Schedule monthly _tagged_ releases in GitHub Actions workflow
+* [ ] Vagrant Cloud Publish
+
 ## Notes
 
 * Consider using [myllynen.rhel-image](https://github.com/myllynen/rhel-image)
