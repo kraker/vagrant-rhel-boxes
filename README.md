@@ -98,6 +98,7 @@ architecture details and the CI publish flow.
   + [X] Vagrant Cloud publish on tag
   + [ ] Schedule monthly tagged releases
   + [ ] Smoke-test boxes in CI before publishing
+  + [ ] Pin GitHub Actions to commit SHAs (supply-chain hardening for the self-hosted runner)
 * [ ] VirtualBox guest additions
 * [ ] Public-facing usage guide / write-up
 
