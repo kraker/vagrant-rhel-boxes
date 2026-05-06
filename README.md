@@ -7,6 +7,7 @@ Build and publish RHEL Vagrant boxes for libvirt and VirtualBox.
 Published to [Vagrant Cloud under `kraker`][1].
 
 * `kraker/rhel-10` — RHEL 10 base box (libvirt + virtualbox, x86_64)
+* `kraker/rhel-9` — RHEL 9 base box (libvirt + virtualbox, x86_64)
 
 [1]: https://app.vagrantup.com/kraker
 
