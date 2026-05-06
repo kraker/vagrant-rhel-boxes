@@ -5,6 +5,7 @@
 
 # vagrant
 .vagrant/
+.rhel-credentials
 
 # image-builder build artifacts
 build/

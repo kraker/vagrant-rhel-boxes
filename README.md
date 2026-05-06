@@ -47,24 +47,21 @@ A Red Hat subscription is required for the guest. A free
 
 ## Using a Box
 
-Set your subscription credentials as env vars, then `vagrant up`. The
-included `Vagrantfile` reads from `RHSM_*` env vars to authenticate with Red Hat
-Subscription Manager.
+Copy the credentials template, fill in your Red Hat Subscription Manager
+username and password, source it, then `vagrant up`:
 
 ```bash
-# Activation key (recommended for automation):
-export RHSM_ORG=...
-export RHSM_ACTIVATIONKEY=...
-
-# Or username/password (Red Hat Developer account):
-export RHSM_USERNAME=...
-export RHSM_PASSWORD=...
-
-vagrant up --provider=libvirt   # or --provider=virtualbox
+cp .rhel-credentials.template .rhel-credentials
+# Edit .rhel-credentials with your Red Hat Developer credentials.
+source .rhel-credentials
+vagrant up                      # or `vagrant up --provider=virtualbox`
 ```
 
-If neither pair of env vars is set, the VM still boots but without an attached
-subscription which provides access to Red Hat's repositories.
+`.rhel-credentials` is gitignored. The `Vagrantfile` also accepts
+`RHSM_ORG` + `RHSM_ACTIVATIONKEY` for activation-key-based auth (handy
+for automation), if you'd rather replace the username/password lines
+in `.rhel-credentials`. If no credentials are set, the VM still boots,
+but `dnf` can't pull from Red Hat's repos.
 
 ## Building Boxes Locally
 
