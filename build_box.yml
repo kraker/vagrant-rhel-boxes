@@ -4,9 +4,14 @@
   hosts: localhost
   become: true
   vars:
-    blueprint_path: "blueprints/{{ distro | default('rhel-10') }}.toml"
     output_dir: "build/"
-    box_name: kraker/rhel-10
+    distro: "rhel-10.0"
+    # Major version (e.g. rhel-10.0 -> rhel-10). Selects the blueprint
+    # template (one .toml.j2 per major) and matches the Vagrant Cloud
+    # box name (kraker/<distro_family>).
+    distro_family: "{{ distro.split('.')[0] }}"
+    provider: "libvirt"
+    box_version: "0.0.1"
     # Resolved on the controller side, before `become` switches us to root,
     # so this captures the real invoking user (github-runner in CI, the
     # shell user locally). `ansible_user_id` would resolve to root once
@@ -19,6 +24,20 @@
         name: image-builder
         state: present
 
+    - name: Ensure output_dir exists
+      ansible.builtin.file:
+        path: "{{ output_dir }}"
+        state: directory
+        owner: "{{ invoking_user }}"
+        group: "{{ invoking_user }}"
+        mode: "0755"
+
+    - name: Render blueprint with distro and box_version substituted
+      ansible.builtin.template:
+        src: "blueprints/{{ distro_family }}.toml.j2"
+        dest: "{{ output_dir }}/{{ distro }}.toml"
+        mode: "0644"
+
     # image-builder runs as root; the always: block chowns artifacts back so
     # non-root tasks (vagrant box add, CI artifact upload) can read them
     # whether the build succeeded or failed.
@@ -27,8 +46,8 @@
         - name: Build the Vagrant box (several minutes)
           ansible.builtin.command:
             cmd: >-
-              image-builder build vagrant-{{ provider | default('libvirt') }}
-              --blueprint {{ blueprint_path }}
+              image-builder build vagrant-{{ provider }}
+              --blueprint {{ output_dir }}/{{ distro }}.toml
               --output-dir "{{ output_dir }}"
               --with-manifest
           changed_when: true
@@ -40,12 +59,3 @@
             owner: "{{ invoking_user }}"
             group: "{{ invoking_user }}"
             recurse: true
-
-    # - name: Add the built box to the local Vagrant index
-    #   ansible.builtin.command:
-    #     cmd: >
-    #       vagrant box add --force
-    #       --name {{ box_name }}
-    #       --provider={{ provider }}
-    #       {{ artifact_path }}
-    #   changed_when: true
