@@ -90,7 +90,7 @@ architecture details and the CI publish flow.
 
 * Distros
   + [X] RHEL 10.x
-  + [ ] RHEL 9.x
+  + [X] RHEL 9.x
 * Architectures
   + [X] x86_64 / amd64
   + [ ] aarch64 / arm64 (needs a separate self-hosted runner)
