@@ -2,8 +2,28 @@
 # vi: set ft=ruby :
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "kraker/rhel-10.0"
+  config.vm.box = "kraker/rhel-10"
   config.vm.hostname = "rhel10"
+
+  # vagrant-registration: register the guest with subscription-manager so dnf
+  # can pull from RHEL BaseOS / AppStream. Credentials come from env vars —
+  # never hardcode them in this file. Set ONE of:
+  #
+  #   RHSM_ORG + RHSM_ACTIVATIONKEY   (recommended for automation)
+  #   RHSM_USERNAME + RHSM_PASSWORD   (interactive Red Hat Developer account)
+  #
+  # If neither is set, registration is skipped — the VM boots and SSH works,
+  # but subscription-gated `dnf install` will fail until you register
+  # manually inside the guest.
+  if ENV['RHSM_ORG'] && ENV['RHSM_ACTIVATIONKEY']
+    config.registration.org           = ENV['RHSM_ORG']
+    config.registration.activationkey = ENV['RHSM_ACTIVATIONKEY']
+  elsif ENV['RHSM_USERNAME'] && ENV['RHSM_PASSWORD']
+    config.registration.username = ENV['RHSM_USERNAME']
+    config.registration.password = ENV['RHSM_PASSWORD']
+  else
+    config.registration.skip = true
+  end
 
   # Shared settings across providers
   cpus = 2
