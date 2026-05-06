@@ -22,7 +22,7 @@ jobs:
       fail-fast: false
       matrix:
         provider: [libvirt, virtualbox]
-        distro: [rhel-10.0, rhel-10.1]
+        distro: [rhel-10]
     steps:
       - uses: actions/checkout@v6
 
