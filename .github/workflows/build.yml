@@ -3,11 +3,6 @@ name: Build Vagrant boxes
 on:
   workflow_dispatch:
   push:
-    branches: [main]
-    paths:
-      - 'blueprints/**'
-      - 'build_box.yml'
-      - '.github/workflows/build.yml'
     tags: ['v*']
 
 # One run per branch. Keeps the matrix from racing itself when commits
