@@ -15,6 +15,11 @@ Vagrant.configure("2") do |config|
   # If neither is set, registration is skipped — the VM boots and SSH works,
   # but subscription-gated `dnf install` will fail until you register
   # manually inside the guest.
+
+  # Suppress --auto-attach: RHEL 9+ uses Simple Content Access and
+  # subscription-manager rejects the flag the plugin passes by default.
+  config.registration.auto_attach = false
+
   if ENV['RHSM_ORG'] && ENV['RHSM_ACTIVATIONKEY']
     config.registration.org           = ENV['RHSM_ORG']
     config.registration.activationkey = ENV['RHSM_ACTIVATIONKEY']
