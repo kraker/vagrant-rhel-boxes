@@ -84,6 +84,18 @@ architecture details and the CI publish flow.
 
 [6]: https://osbuild.org/docs/user-guide/image-builder-cli/
 
+## Development
+
+Lint locally before pushing (mirror of CI):
+
+```bash
+uv run prek run --all-files     # one-shot
+uv run prek install             # auto-run on every commit
+```
+
+`prek` is a drop-in `pre-commit` replacement — same hook IDs, same
+`.pre-commit-config.yaml` schema, faster.
+
 ## Roadmap
 
 * Distros
