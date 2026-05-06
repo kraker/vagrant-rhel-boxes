@@ -4,7 +4,7 @@
   hosts: localhost
   become: true
   vars:
-    blueprint_path: "blueprints/{{ distro | default('rhel-10.0') }}.toml"
+    blueprint_path: "blueprints/{{ distro | default('rhel-10') }}.toml"
     output_dir: "build/"
     box_name: kraker/rhel-10
     # Resolved on the controller side, before `become` switches us to root,
