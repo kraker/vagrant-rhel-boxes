@@ -12,9 +12,8 @@ Vagrant.configure("2") do |config|
   #   RHSM_ORG + RHSM_ACTIVATIONKEY   (recommended for automation)
   #   RHSM_USERNAME + RHSM_PASSWORD   (interactive Red Hat Developer account)
   #
-  # If neither is set, registration is skipped — the VM boots and SSH works,
-  # but subscription-gated `dnf install` will fail until you register
-  # manually inside the guest.
+  # If neither is set, vagrant-registration prompts for Red Hat username/password
+  # during `vagrant up`.
 
   # Suppress --auto-attach: RHEL 9+ uses Simple Content Access and
   # subscription-manager rejects the flag the plugin passes by default.
@@ -26,8 +25,6 @@ Vagrant.configure("2") do |config|
   elsif ENV['RHSM_USERNAME'] && ENV['RHSM_PASSWORD']
     config.registration.username = ENV['RHSM_USERNAME']
     config.registration.password = ENV['RHSM_PASSWORD']
-  else
-    config.registration.skip = true
   end
 
   # Shared settings across providers

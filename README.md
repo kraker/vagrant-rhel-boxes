@@ -47,25 +47,42 @@ A Red Hat subscription is required for the guest. A free
 
 ## Using a Box
 
-Copy the credentials template, fill in your Red Hat Subscription Manager
-username and password, source it, then `vagrant up`:
+Registering with Red Hat Subscription Manager is required for `dnf` to
+pull from RHEL repos inside the guest. Prefer an [activation key][6]
+with your Red Hat organization ID, especially for repeatable local use
+or automation:
 
 ```bash
-cp .rhel-credentials.template .rhel-credentials
-# Edit .rhel-credentials with your Red Hat Developer credentials.
-source .rhel-credentials
+export RHSM_ORG="your_numeric_org_id"
+export RHSM_ACTIVATIONKEY="your_activation_key"
 vagrant up                      # or `vagrant up --provider=virtualbox`
 ```
 
-`.rhel-credentials` is gitignored. The `Vagrantfile` also accepts
-`RHSM_ORG` + `RHSM_ACTIVATIONKEY` for activation-key-based auth (handy
-for automation), if you'd rather replace the username/password lines
-in `.rhel-credentials`. If no credentials are set, the VM still boots,
-but `dnf` can't pull from Red Hat's repos.
+A Red Hat Developer account can create activation keys in the Hybrid
+Cloud Console. The Activation Keys page also shows the numeric
+organization ID to use with `RHSM_ORG`.
+
+If no credentials are set, `vagrant up` prompts to register with your
+Red Hat username and password. Press Enter or answer `y` to register,
+or answer `n` to skip registration for that VM boot.
+
+For non-interactive username/password registration, the `Vagrantfile`
+also accepts `RHSM_USERNAME` + `RHSM_PASSWORD` environment variables.
+Do not use username/password registration in CI or on shared systems;
+prefer activation keys instead.
+
+```bash
+export RHSM_USERNAME="your_redhat_username"
+export RHSM_PASSWORD="your_redhat_password"
+vagrant up                      # or `vagrant up --provider=virtualbox`
+```
+
+If registration is skipped, the VM still boots, but `dnf` can't pull
+from Red Hat's repos until you register manually inside the guest.
 
 ## Building Boxes Locally
 
-The project uses Red Hat's [`image-builder`][6] CLI driven by an
+The project uses Red Hat's [`image-builder`][7] CLI driven by an
 Ansible playbook to produce the boxes that get published. To run a
 build yourself:
 
@@ -82,7 +99,8 @@ uv run ansible-playbook build_box.yml -e distro=rhel-10.0 -e provider=libvirt
 The resulting `.box` lands under `build/`. See `CLAUDE.md` for
 architecture details and the CI publish flow.
 
-[6]: https://osbuild.org/docs/user-guide/image-builder-cli/
+[6]: https://docs.redhat.com/en/documentation/subscription_central/1-latest/html/getting_started_with_activation_keys_on_the_hybrid_cloud_console/assembly-using-activation-keys
+[7]: https://osbuild.org/docs/user-guide/image-builder-cli/
 
 ## Development
 
